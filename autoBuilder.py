@@ -7,7 +7,7 @@ import locale
 import os
 import shutil
 import json
-from env import *
+from config import *
 
 
 def get_login(realm, username, may_save):
@@ -92,10 +92,22 @@ def build(project):
     try:
         print_log('build project ' + project.get_name() + ' start');
         print_log(os.popen('npm run build --prefix ' + project.get_local_code_path()).readlines());
-        print_log('build project ' + project.get_name() + ' end');
+        print_log('build project ' + project.get_name() + ' finished');
     except Exception,err:
         print_log('build project ' + project_name + ' error: ' + str(err));
 
+def copy_to_dist(project):
+    project_name = project.get_name();
+    dist_dir = project.get_dist_dir();
+    src_dist_dir = project.get_local_code_path() + '/dist';#表示源码build之后的生成目录
+    try:
+       print_log('copy project ' + project_name + ' distribution to ' + dist_dir + ' start');
+       print_log(os.popen('rm -r ' + dist_dir).readlines());  #删除发布目录
+       print_log(os.popen('cp -r ' + src_dist_dir + ' '+dist_dir).readlines());  #拷贝源码目录中的dist至发布目录
+       print_log('copy project ' + project_name + ' distribution to ' + dist_dir + ' finished');
+    except Exception, err:
+       print_log('copy project ' + project_name + ' distribution to ' + dist_dir + ' error: ' + str(err));
+       
 
 def setlocale():
     language_code, encoding = locale.getdefaultlocale()
