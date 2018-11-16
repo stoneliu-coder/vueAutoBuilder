@@ -8,7 +8,7 @@ import os
 import shutil
 import json
 from config import *
-
+import subprocess
 
 def get_login(realm, username, may_save):
     return True, Config.username, Config.password, True
@@ -44,6 +44,16 @@ def svn_update(project,target_version):
 
 def print_log(msg):
     now = time.strftime("%Y-%m-%d %H:%M:%S");
+    date = time.strftime('%Y-%m-%d');
+    try:
+        if not os.path.exists(Config.log_dir):
+            os.makedirs(Config.log_dir);
+        fo = open(Config.log_dir + 'log.txt', 'a');
+        fo.write(now + ' ' + str(msg) + '\n');
+        fo.close();
+    except Exception,err:
+        print now,'write log file error:' + str(err);
+    
     print now,msg;
 
 def check_need_update(project):
@@ -79,8 +89,9 @@ def auto_update():
                 version = result[1];
                 if(need_update):
                     print_log(project_name +' new version detected:' + str(version));
-                    svn_update(project,version);
-                    build(project);
+                    svn_update(project,version);#更新该目录至指定svn版本
+                    build(project);#build 该项目
+                    copy_to_dist(project);#复制生成后的文件到发布目录，主要防止生成时间过长造成发布目录访问受影响
                 else:
                     print_log(project_name + ' no avaliable version!');
             except Exception,err:
@@ -91,23 +102,38 @@ def build(project):
     project_name = project.get_name();
     try:
         print_log('build project ' + project.get_name() + ' start');
-        print_log(os.popen('npm run build --prefix ' + project.get_local_code_path()).readlines());
+        scripts = 'npm run build --prefix ' + project.get_local_code_path();
+        run_shell_scripts(scripts);
         print_log('build project ' + project.get_name() + ' finished');
     except Exception,err:
         print_log('build project ' + project_name + ' error: ' + str(err));
+        raise Exception,err;
 
 def copy_to_dist(project):
     project_name = project.get_name();
-    dist_dir = project.get_dist_dir();
+    dist_dir = project.get_dist_path();
     src_dist_dir = project.get_local_code_path() + '/dist';#表示源码build之后的生成目录
     try:
+       scripts = '';
+       if os.path.exists(dist_dir):
+           print_log('delete directory ' + dist_dir);
+           scripts = 'rm -r ' + dist_dir;
+           run_shell_scripts(scripts);  #删除发布目录
+       
        print_log('copy project ' + project_name + ' distribution to ' + dist_dir + ' start');
-       print_log(os.popen('rm -r ' + dist_dir).readlines());  #删除发布目录
-       print_log(os.popen('cp -r ' + src_dist_dir + ' '+dist_dir).readlines());  #拷贝源码目录中的dist至发布目录
+       scripts = 'cp -r ' + src_dist_dir + ' ' + dist_dir;
+       run_shell_scripts(scripts);  #拷贝源码目录中的dist至发布目录
        print_log('copy project ' + project_name + ' distribution to ' + dist_dir + ' finished');
     except Exception, err:
        print_log('copy project ' + project_name + ' distribution to ' + dist_dir + ' error: ' + str(err));
-       
+
+def run_shell_scripts(scripts):       
+    p = subprocess.Popen(scripts,shell=True,stdout=subprocess.PIPE);
+    out = p.communicate();
+    print_log(out);
+    if(p.returncode != 0 ):
+        raise Exception('run "' + scripts + '" error! Exit code is ' + str(p.returncode));
+    print_log('run "' + scripts + '" successfully!');
 
 def setlocale():
     language_code, encoding = locale.getdefaultlocale()
@@ -117,15 +143,14 @@ def setlocale():
         encoding = 'UTF-8'
     if encoding.lower() == 'utf':
         encoding = 'UTF-8'
+    locale.setlocale( locale.LC_ALL, '%s.%s' % (language_code, encoding));
 
-    locale.setlocale( locale.LC_ALL, '%s.%s' % (language_code, encoding))
+
 
 if "__main__" == __name__:
     setlocale();
     client = pysvn.Client();
     client.callback_get_login = get_login;
     ensure_checkout();
-    # check_out();
     auto_update();
-    # print_log(os.popen('ls').readlines());
-
+    
