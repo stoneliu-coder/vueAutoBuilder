@@ -2,13 +2,15 @@
 # -*- coding: utf8 -*-
    
 import pysvn
-import time
 import locale
 import os
 import shutil
 import json
 from config import *
 import subprocess
+import sys
+import time
+from datetime import datetime
 
 def get_login(realm, username, may_save):
     return True, Config.username, Config.password, True
@@ -43,8 +45,8 @@ def svn_update(project,target_version):
         print_log('update ' + project.get_name() + ' error:' + str(err));
 
 def print_log(msg):
-    now = time.strftime("%Y-%m-%d %H:%M:%S");
-    date = time.strftime('%Y-%m-%d');
+    dt = time.localtime();
+    now = time.strftime('%Y-%M-%d %H:%m:%S', time.localtime());
     try:
         if not os.path.exists(Config.log_dir):
             os.makedirs(Config.log_dir);
@@ -128,9 +130,11 @@ def copy_to_dist(project):
        print_log('copy project ' + project_name + ' distribution to ' + dist_dir + ' error: ' + str(err));
 
 def run_shell_scripts(scripts):       
+    reload(sys);
+    sys.setdefaultencoding('utf-8');
     p = subprocess.Popen(scripts,shell=True,stdout=subprocess.PIPE);
-    out = p.communicate();
-    print_log(out);
+    out,err = p.communicate();
+    print_log(out.decode('gbk'));
     if(p.returncode != 0 ):
         raise Exception('run "' + scripts + '" error! Exit code is ' + str(p.returncode));
     print_log('run "' + scripts + '" successfully!');
